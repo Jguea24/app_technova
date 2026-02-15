@@ -3,8 +3,7 @@ from django.contrib.auth.models import User
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
+from django.core.exceptions import ObjectDoesNotExist
 
 from .models import Product, Cart
 from .serializers import ProductSerializer, CartSerializer, RegisterSerializer
@@ -31,6 +30,14 @@ class LoginView(APIView):
                 return Response({'error': 'Credenciales inválidas'}, status=400)
 
             refresh = RefreshToken.for_user(user)
+            phone = ''
+            address = ''
+            try:
+                phone = user.profile.phone
+                address = user.profile.address
+            except ObjectDoesNotExist:
+                phone = ''
+                address = ''
 
             return Response({
                 'access': str(refresh.access_token),
@@ -38,7 +45,10 @@ class LoginView(APIView):
                 'user': {
                     'id': user.id,
                     'username': user.username,
-                    'email': user.email
+                    'email': user.email,
+                    'full_name': f'{user.first_name} {user.last_name}'.strip(),
+                    'phone': phone,
+                    'address': address
                 }
             })
 
