@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 from django.utils.html import format_html
-from .models import Banner, Category, Product, Cart, UserProfile
+from .models import Banner, Category, Product, Cart, UserProfile, DeliveryAddress, RoleChangeRequest
 
 # Register your models here.
 
@@ -43,8 +43,18 @@ class BannerAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category', 'price', 'stock', 'image_preview')
-    search_fields = ('name', 'category__name')
+    list_display = (
+        'name',
+        'category',
+        'short_description',
+        'price',
+        'old_price',
+        'rating',
+        'reviews_count',
+        'stock',
+        'image_preview',
+    )
+    search_fields = ('name', 'description', 'category__name')
     list_filter = ('category', 'price',)
     readonly_fields = ('image_preview',)
 
@@ -57,6 +67,13 @@ class ProductAdmin(admin.ModelAdmin):
             obj.image.url
         )
 
+    @admin.display(description='Descripcion')
+    def short_description(self, obj):
+        text = (obj.description or '').strip()
+        if len(text) <= 40:
+            return text
+        return f'{text[:40]}...'
+
 @admin.register(Cart)
 class CartAdmin(admin.ModelAdmin):
     list_display = ('user', 'product', 'quantity')
@@ -67,6 +84,20 @@ class CartAdmin(admin.ModelAdmin):
 class UserProfileAdmin(admin.ModelAdmin):
     list_display = ('user', 'phone', 'address')
     search_fields = ('user__username', 'user__email', 'phone', 'address')
+
+
+@admin.register(DeliveryAddress)
+class DeliveryAddressAdmin(admin.ModelAdmin):
+    list_display = ('user', 'main_address', 'city', 'is_default', 'created_at')
+    list_filter = ('city', 'is_default')
+    search_fields = ('user__username', 'user__email', 'main_address', 'secondary_street', 'apartment', 'city')
+
+
+@admin.register(RoleChangeRequest)
+class RoleChangeRequestAdmin(admin.ModelAdmin):
+    list_display = ('user', 'requested_role', 'status', 'created_at')
+    list_filter = ('requested_role', 'status')
+    search_fields = ('user__username', 'user__email', 'reason')
 
 
 class UserProfileInline(admin.StackedInline):

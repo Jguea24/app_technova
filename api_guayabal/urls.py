@@ -8,9 +8,17 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from app.views import (
     BannerListView,
+    CartCountView,
+    ChangePasswordView,
+    DeliveryAddressDetailView,
+    DeliveryAddressListCreateView,
+    GeoAutocompleteView,
     CategoryListView,
     LoginView,
+    MeView,
     RegisterView,
+    RoleChangeRequestListCreateView,
+    ProductDetailView,
     ProductListView,
     CartView
 )
@@ -33,12 +41,20 @@ urlpatterns = [
     path('register/', RegisterView.as_view()),
     path('login/', LoginView.as_view()),
     path('token/refresh/', TokenRefreshView.as_view()),
+    path('me/', MeView.as_view()),
+    path('me/change-password/', ChangePasswordView.as_view()),
 
     # Recursos
     path('banners/', BannerListView.as_view()),
     path('categories/', CategoryListView.as_view()),
     path('products/', ProductListView.as_view()),
+    path('products/<int:pk>/', ProductDetailView.as_view()),
+    path('cart/count/', CartCountView.as_view()),
     path('cart/', CartView.as_view()),
+    path('addresses/', DeliveryAddressListCreateView.as_view()),
+    path('addresses/<int:pk>/', DeliveryAddressDetailView.as_view()),
+    path('role-requests/', RoleChangeRequestListCreateView.as_view()),
+    path('geo/autocomplete/', GeoAutocompleteView.as_view()),
 ]
 
 if settings.DEBUG:
