@@ -19,6 +19,8 @@ from app.views import (
     CategoryListView,
     LoginView,
     MeView,
+    AdminUserListView,
+    AdminUserDetailView,
     OrderDetailView,
     OrderListCreateView,
     OrderTrackingAssignDriverView,
@@ -51,6 +53,8 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view()),
     path('me/', MeView.as_view()),
     path('me/change-password/', ChangePasswordView.as_view()),
+    path('users/', AdminUserListView.as_view()),
+    path('users/<int:pk>/', AdminUserDetailView.as_view()),
 
     # Recursos
     path('banners/', BannerListView.as_view()),

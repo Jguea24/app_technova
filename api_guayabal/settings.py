@@ -92,7 +92,7 @@ WSGI_APPLICATION = 'api_guayabal.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'api_guayabal',
+        'NAME': 'app_TechNova',
         'USER': 'guayabal_user',
         'PASSWORD': 'admin1234',
         'HOST': 'localhost',

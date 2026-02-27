@@ -21,6 +21,8 @@ from .models import (
 
 class RegisterSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    first_name = serializers.CharField(required=False, allow_blank=True)
+    last_name = serializers.CharField(required=False, allow_blank=True)
     phone = serializers.CharField(write_only=True, required=False, allow_blank=True)
     address = serializers.CharField(write_only=True, required=False, allow_blank=True)
     username = serializers.CharField(required=False, allow_blank=True)
@@ -33,6 +35,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'full_name',
+            'first_name',
+            'last_name',
             'email',
             'phone',
             'address',
@@ -58,6 +62,12 @@ class RegisterSerializer(serializers.ModelSerializer):
                 or data.get('fullName')
                 or ''
             )
+
+        if 'first_name' not in raw_data and 'nombre' in data:
+            raw_data['first_name'] = data.get('first_name') or data.get('nombre')
+
+        if 'last_name' not in raw_data and 'apellido' in data:
+            raw_data['last_name'] = data.get('last_name') or data.get('apellido')
 
         if 'phone' not in raw_data:
             raw_data['phone'] = (
@@ -175,23 +185,31 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         full_name = (validated_data.pop('full_name', '') or '').strip()
+        first_name = (validated_data.pop('first_name', '') or '').strip()
+        last_name = (validated_data.pop('last_name', '') or '').strip()
         phone = (validated_data.pop('phone', '') or '').strip()
         address = (validated_data.pop('address', '') or '').strip()
         requested_role = validated_data.pop('role', '')
         role_reason = (validated_data.pop('role_reason', '') or '').strip()
         validated_data.pop('password2', None)
 
+        if full_name:
+            name_parts = full_name.split(maxsplit=1)
+            if not first_name:
+                first_name = name_parts[0]
+            if not last_name and len(name_parts) > 1:
+                last_name = name_parts[1]
+
+        if first_name:
+            validated_data['first_name'] = first_name
+        if last_name:
+            validated_data['last_name'] = last_name
+
         password = validated_data.pop('password')
         user = User.objects.create_user(
             password=password,
             **validated_data
         )
-
-        if full_name:
-            name_parts = full_name.split(maxsplit=1)
-            user.first_name = name_parts[0]
-            user.last_name = name_parts[1] if len(name_parts) > 1 else ''
-            user.save(update_fields=['first_name', 'last_name'])
 
         UserProfile.objects.update_or_create(
             user=user,
@@ -669,6 +687,8 @@ class MeSerializer(serializers.ModelSerializer):
             'id',
             'username',
             'email',
+            'first_name',
+            'last_name',
             'full_name',
             'phone',
             'address',
@@ -719,28 +739,39 @@ class MeSerializer(serializers.ModelSerializer):
     def to_internal_value(self, data):
         raw_data = data.copy() if hasattr(data, 'copy') else dict(data)
 
-        if 'full_name' not in raw_data:
+        if 'full_name' not in raw_data and (
+            'name' in data or 'nombre' in data or 'fullName' in data
+        ):
             raw_data['full_name'] = (
                 data.get('full_name')
                 or data.get('name')
                 or data.get('nombre')
                 or data.get('fullName')
-                or ''
             )
 
-        if 'phone' not in raw_data:
+        if 'first_name' not in raw_data and 'nombre' in data:
+            raw_data['first_name'] = (
+                data.get('first_name')
+                or data.get('nombre')
+            )
+
+        if 'last_name' not in raw_data and 'apellido' in data:
+            raw_data['last_name'] = (
+                data.get('last_name')
+                or data.get('apellido')
+            )
+
+        if 'phone' not in raw_data and ('telefono' in data or 'celular' in data):
             raw_data['phone'] = (
                 data.get('phone')
                 or data.get('telefono')
                 or data.get('celular')
-                or ''
             )
 
-        if 'address' not in raw_data:
+        if 'address' not in raw_data and 'direccion' in data:
             raw_data['address'] = (
                 data.get('address')
                 or data.get('direccion')
-                or ''
             )
 
         return super().to_internal_value(raw_data)
@@ -766,6 +797,8 @@ class MeSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         full_name = validated_data.pop('full_name', None)
+        first_name = validated_data.pop('first_name', None)
+        last_name = validated_data.pop('last_name', None)
         phone = validated_data.pop('phone', None)
         address = validated_data.pop('address', None)
 
@@ -777,6 +810,11 @@ class MeSerializer(serializers.ModelSerializer):
             name_parts = full_name.split(maxsplit=1) if full_name else []
             instance.first_name = name_parts[0] if len(name_parts) > 0 else ''
             instance.last_name = name_parts[1] if len(name_parts) > 1 else ''
+        else:
+            if first_name is not None:
+                instance.first_name = (first_name or '').strip()
+            if last_name is not None:
+                instance.last_name = (last_name or '').strip()
 
         instance.save()
 
@@ -787,6 +825,206 @@ class MeSerializer(serializers.ModelSerializer):
             if address is not None:
                 profile.address = (address or '').strip()
             profile.save()
+
+        return instance
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    role = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    phone = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    address = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    roles = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'username',
+            'email',
+            'first_name',
+            'last_name',
+            'is_staff',
+            'role',
+            'roles',
+            'phone',
+            'address',
+        ]
+        read_only_fields = ['id', 'roles']
+
+    def _resolve_primary_role(self, roles):
+        role_set = set(roles)
+        if 'ADMIN' in role_set:
+            return 'admin'
+        if 'DRIVER' in role_set or 'REPARTIDOR' in role_set:
+            return 'driver'
+        if 'PROVIDER' in role_set:
+            return 'provider'
+        if 'CLIENTE' in role_set:
+            return 'client'
+        return 'user'
+
+    def get_roles(self, instance):
+        return sorted(list(instance.groups.values_list('name', flat=True)))
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['phone'] = getattr(getattr(instance, 'profile', None), 'phone', '')
+        data['address'] = getattr(getattr(instance, 'profile', None), 'address', '')
+        data['role'] = self._resolve_primary_role(self.get_roles(instance))
+        return data
+
+    def to_internal_value(self, data):
+        raw_data = data.copy() if hasattr(data, 'copy') else dict(data)
+
+        if 'first_name' not in raw_data and 'nombre' in data:
+            raw_data['first_name'] = (
+                data.get('first_name')
+                or data.get('nombre')
+            )
+
+        if 'last_name' not in raw_data and 'apellido' in data:
+            raw_data['last_name'] = (
+                data.get('last_name')
+                or data.get('apellido')
+            )
+
+        if 'phone' not in raw_data and ('telefono' in data or 'celular' in data):
+            raw_data['phone'] = (
+                data.get('phone')
+                or data.get('telefono')
+                or data.get('celular')
+            )
+
+        if 'address' not in raw_data and 'direccion' in data:
+            raw_data['address'] = (
+                data.get('address')
+                or data.get('direccion')
+            )
+
+        if 'role' not in raw_data and (
+            'rol' in data or 'requested_role' in data or 'user_role' in data
+        ):
+            raw_data['role'] = (
+                data.get('role')
+                or data.get('rol')
+                or data.get('requested_role')
+                or data.get('user_role')
+            )
+
+        if 'is_staff' not in raw_data:
+            if 'staff' in data:
+                raw_data['is_staff'] = data.get('staff')
+            elif 'es_staff' in data:
+                raw_data['is_staff'] = data.get('es_staff')
+
+        return super().to_internal_value(raw_data)
+
+    def validate_email(self, value):
+        email = (value or '').strip().lower()
+        user = self.instance
+        if User.objects.filter(email=email).exclude(id=user.id).exists():
+            raise serializers.ValidationError('Ya existe una cuenta con este correo.')
+        return email
+
+    def validate_username(self, value):
+        username = (value or '').strip()
+        user = self.instance
+        if User.objects.filter(username=username).exclude(id=user.id).exists():
+            raise serializers.ValidationError('Este usuario ya existe.')
+        return username
+
+    def validate_phone(self, value):
+        value = (value or '').strip()
+        if not value:
+            return value
+        if not value.isdigit():
+            raise serializers.ValidationError('El telefono solo debe contener numeros.')
+        if len(value) != 10:
+            raise serializers.ValidationError('El telefono debe tener exactamente 10 digitos.')
+        if not value.startswith('09'):
+            raise serializers.ValidationError('El telefono debe iniciar con 09.')
+        return value
+
+    def validate_role(self, value):
+        role = (value or '').strip().lower()
+        if not role:
+            return ''
+        role_map = {
+            'cliente': 'client',
+            'client': 'client',
+            'customer': 'client',
+            'usuario': 'client',
+            'user': 'client',
+            'repartidor': 'driver',
+            'driver': 'driver',
+            'proveedor': 'provider',
+            'provider': 'provider',
+            'admin': 'admin',
+            'administrador': 'admin',
+        }
+        normalized = role_map.get(role, role)
+        if normalized not in {'client', 'driver', 'provider', 'admin'}:
+            raise serializers.ValidationError('Rol invalido. Usa client, driver, provider o admin.')
+        return normalized
+
+    def _apply_role(self, instance, role):
+        if not role:
+            return
+        role_groups = {
+            'client': ['CLIENTE'],
+            'driver': ['CLIENTE', 'DRIVER'],
+            'provider': ['CLIENTE', 'PROVIDER'],
+            'admin': ['ADMIN', 'CLIENTE'],
+        }
+        target_names = role_groups.get(role, [])
+        if not target_names:
+            return
+
+        known_role_names = {'CLIENTE', 'DRIVER', 'PROVIDER', 'ADMIN'}
+        instance.groups.remove(*Group.objects.filter(name__in=known_role_names))
+
+        for name in target_names:
+            group, _ = Group.objects.get_or_create(name=name)
+            instance.groups.add(group)
+
+        if instance.is_superuser:
+            instance.is_staff = True
+        else:
+            instance.is_staff = role == 'admin'
+        instance.save(update_fields=['is_staff'])
+
+    def update(self, instance, validated_data):
+        phone = validated_data.pop('phone', None)
+        address = validated_data.pop('address', None)
+        role = validated_data.pop('role', None)
+
+        if 'username' in validated_data:
+            instance.username = validated_data['username']
+
+        if 'email' in validated_data:
+            instance.email = validated_data['email']
+
+        if 'first_name' in validated_data:
+            instance.first_name = (validated_data['first_name'] or '').strip()
+
+        if 'last_name' in validated_data:
+            instance.last_name = (validated_data['last_name'] or '').strip()
+
+        if 'is_staff' in validated_data:
+            instance.is_staff = validated_data['is_staff']
+
+        instance.save()
+
+        if phone is not None or address is not None:
+            profile, _ = UserProfile.objects.get_or_create(user=instance)
+            if phone is not None:
+                profile.phone = phone.strip()
+            if address is not None:
+                profile.address = (address or '').strip()
+            profile.save()
+
+        if role is not None:
+            self._apply_role(instance, role)
 
         return instance
 

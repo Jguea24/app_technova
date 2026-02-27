@@ -39,9 +39,11 @@ from .serializers import (
     ShipmentLocationUpdateSerializer,
     DeliveryAddressSerializer,
     MeSerializer,
+    AdminUserSerializer,
     ChangePasswordSerializer,
     RoleChangeRequestSerializer,
 )
+from .permissions import IsStaffOrAdminRole
 
 
 class RegisterView(generics.CreateAPIView):
@@ -97,6 +99,23 @@ class MeView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+
+class AdminUserListView(generics.ListAPIView):
+    serializer_class = AdminUserSerializer
+    permission_classes = [IsStaffOrAdminRole]
+
+    def get_queryset(self):
+        return User.objects.all().select_related('profile').prefetch_related('groups')
+
+
+class AdminUserDetailView(generics.RetrieveUpdateAPIView):
+    serializer_class = AdminUserSerializer
+    permission_classes = [IsStaffOrAdminRole]
+    http_method_names = ['get', 'patch', 'put']
+
+    def get_queryset(self):
+        return User.objects.all().select_related('profile').prefetch_related('groups')
 
 
 class ChangePasswordView(APIView):

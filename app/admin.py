@@ -1,6 +1,8 @@
+from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from django.contrib.auth.models import User
+from django.contrib.auth.forms import UserChangeForm, UserCreationForm
+from django.contrib.auth.models import Group, User
 from django.utils.html import format_html
 from .models import (
     Banner,
@@ -17,6 +19,11 @@ from .models import (
 )
 
 # Register your models here.
+
+ROLE_CHOICES = (
+    ('cliente', 'Cliente'),
+    ('admin', 'Admin'),
+)
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -182,17 +189,73 @@ class UserProfileInline(admin.StackedInline):
     fk_name = 'user'
 
 
+class RoleUserChangeForm(UserChangeForm):
+    role = forms.ChoiceField(choices=ROLE_CHOICES, required=False, label='Rol')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            roles = set(self.instance.groups.values_list('name', flat=True))
+            if self.instance.is_superuser or 'ADMIN' in roles:
+                self.fields['role'].initial = 'admin'
+            else:
+                self.fields['role'].initial = 'cliente'
+
+
+class RoleUserCreationForm(UserCreationForm):
+    role = forms.ChoiceField(choices=ROLE_CHOICES, required=False, label='Rol')
+
+
 class UserAdmin(BaseUserAdmin):
+
     inlines = (UserProfileInline,)
     list_display = BaseUserAdmin.list_display + ('role', 'phone', 'address')
+    form = RoleUserChangeForm
+    add_form = RoleUserCreationForm
+    fieldsets = BaseUserAdmin.fieldsets + (
+        ('Rol', {'fields': ('role',)}),
+    )
+    add_fieldsets = BaseUserAdmin.add_fieldsets + (
+        ('Rol', {'fields': ('role',)}),
+    )
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('profile').prefetch_related('groups')
 
+    def _apply_role(self, obj, role):
+        role = (role or '').strip().lower()
+        if obj.is_superuser:
+            role = 'admin'
+        role_groups = Group.objects.filter(
+            name__in={'ADMIN', 'CLIENTE', 'DRIVER', 'PROVIDER', 'REPARTIDOR'}
+        )
+        if role_groups.exists():
+            obj.groups.remove(*role_groups)
+
+        if role == 'admin':
+            admin_group, _ = Group.objects.get_or_create(name='ADMIN')
+            obj.groups.add(admin_group)
+            obj.is_staff = True
+        elif role == 'cliente':
+            cliente_group, _ = Group.objects.get_or_create(name='CLIENTE')
+            obj.groups.add(cliente_group)
+            if not obj.is_superuser:
+                obj.is_staff = False
+        elif not obj.is_superuser:
+            obj.is_staff = False
+
     @admin.display(description='Rol')
     def role(self, obj):
-        roles = list(obj.groups.values_list('name', flat=True))
-        return ', '.join(roles) if roles else '-'
+        role_set = set(obj.groups.values_list('name', flat=True))
+        if obj.is_superuser or 'ADMIN' in role_set:
+            return 'ADMIN'
+        if 'DRIVER' in role_set or 'REPARTIDOR' in role_set:
+            return 'DRIVER'
+        if 'PROVIDER' in role_set:
+            return 'PROVIDER'
+        if 'CLIENTE' in role_set:
+            return 'CLIENTE'
+        return '-'
 
     @admin.display(description='Phone')
     def phone(self, obj):
@@ -201,6 +264,17 @@ class UserAdmin(BaseUserAdmin):
     @admin.display(description='Address')
     def address(self, obj):
         return getattr(getattr(obj, 'profile', None), 'address', '')
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        role = None
+        if hasattr(form, 'cleaned_data'):
+            role = form.cleaned_data.get('role')
+        self._apply_role(form.instance, role)
+        form.instance.save(update_fields=['is_staff'])
 
 
 admin.site.unregister(User)
