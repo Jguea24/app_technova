@@ -839,7 +839,7 @@ def osm_router_base_url():
 
 
 def geocoder_user_agent():
-    return (getattr(settings, 'GEOCODER_USER_AGENT', 'api-guayabal/1.0 (mobile-app)') or 'api-guayabal/1.0')
+    return (getattr(settings, 'GEOCODER_USER_AGENT', 'api-technova/1.0 (mobile-app)') or 'api-technova/1.0')
 
 
 def http_json_get(endpoint, params=None, timeout=8, headers=None):

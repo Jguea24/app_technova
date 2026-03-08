@@ -50,7 +50,7 @@ MIDDLEWARE = [
 
 CORS_ALLOW_ALL_ORIGINS = True
 
-ROOT_URLCONF = 'api_guayabal.urls'
+ROOT_URLCONF = 'api_technova.urls'
 
 TEMPLATES = [
     {
@@ -83,7 +83,7 @@ SIMPLE_JWT = {
 
 
 
-WSGI_APPLICATION = 'api_guayabal.wsgi.application'
+WSGI_APPLICATION = 'api_technova.wsgi.application'
 
 
 # Database
@@ -161,6 +161,6 @@ GOOGLE_MAPS_REGION = os.getenv('GOOGLE_MAPS_REGION', 'ec')
 GEO_PROVIDER = os.getenv('GEO_PROVIDER', 'osm').strip().lower()
 
 # OpenStreetMap / OSRM settings
-GEOCODER_USER_AGENT = os.getenv('GEOCODER_USER_AGENT', 'api-guayabal/1.0 (mobile-app)')
+GEOCODER_USER_AGENT = os.getenv('GEOCODER_USER_AGENT', 'api-technova/1.0 (mobile-app)')
 OSM_NOMINATIM_BASE_URL = os.getenv('OSM_NOMINATIM_BASE_URL', 'https://nominatim.openstreetmap.org')
 OSM_ROUTER_BASE_URL = os.getenv('OSM_ROUTER_BASE_URL', 'https://router.project-osrm.org')
